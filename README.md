@@ -1,0 +1,119 @@
+# ChatHub Desktop 🚀
+
+[![Electron](https://img.shields.io/badge/Electron-v42.2.0-blue.svg?style=flat-family&logo=electron)](https://www.electronjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-v4.5.1-646CFF.svg?style=flat-family&logo=vite)](https://vitejs.dev/)
+[![React](https://img.shields.io/badge/React-v18.2.0-61DAFB.svg?style=flat-family&logo=react)](https://reactjs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v3.4.0-38B2AC.svg?style=flat-family&logo=tailwindcss)](https://tailwindcss.com/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+**ChatHub Desktop** 是一款专为桌面端设计的、高颜值且极速的 **多 AI 机器人聚合客户端**。通过创新的分栏布局和统一的同步输入终端，它可以让你在同一界面下同时对比、协同和调用全球最主流的 AI 聊天服务。
+
+> [!NOTE]
+> 本项目是在开源项目 [ChatHub](https://github.com/chathub-dev/chathub) 的基础上进行二次开发与深度定制而成的。感谢原作者及社区的杰出工作！
+
+---
+
+## ✨ 核心特性
+
+- 🖥️ **All-in-One 多栏并进**
+  - 支持 **双栏、三栏、四栏、六宫格** 以及 **图文输入** 等多种灵活布局。
+  - 自动适应窗口尺寸，助你在多模型之间进行精确的对比测试和协同办公。
+
+- ⌨️ **VS Code 风格的「同步发送终端」**
+  - 类似 VS Code 的集成式底部终端面板，支持快捷键 `` Ctrl + ` `` 一键唤起与隐藏。
+  - **同步广播**：在终端内输入 prompt，点击发送（或快捷键 `Ctrl + Enter`），消息将同时分发并提交给当前布局中的所有 AI 机器人。
+
+- 🤖 **全面自定义机器人**
+  - 支持在设置页面中自由 **添加、编辑、删除** 机器人。
+  - 只需要定义名称和 URL 即可轻松接入任何基于网页端的 AI 服务或本地部署服务。
+  - **动态 Favicon 获取**：客户端会自动请求并加载各个域名的原厂高画质图标。
+
+- 🔌 **全局网络代理支持**
+  - 支持“系统默认代理”与“自定义代理服务器”。
+  - 主进程底层拦截，彻底解决部分 AI 平台在网络层面限制的问题。
+
+- 🖱️ **深度原生系统集成**
+  - 无缝的 **右键上下文菜单**：支持撤销、重做、剪切、复制、粘贴、全选、复制链接、重新加载页面、以及检查元素（DevTools）。
+  - 完美剔除窗口顶部的原生系统菜单栏，提供纯净沉浸的客户端边框体验。
+  - 内置已解锁的本地 Premium 特权，尽享所有多栏布局。
+
+---
+
+## 🛠️ 技术栈
+
+- **前端框架**：Vite + React 18 + TS
+- **桌面容器**：Electron 42
+- **状态管理**：Jotai (原子化状态管理)
+- **动效处理**：Framer Motion
+- **样式方案**：Tailwind CSS + SCSS
+- **打包工具**：Electron Builder
+
+---
+
+## 🚀 快速启动
+
+在本地克隆代码后，请确保你的系统已安装 `Node.js` 和 `Yarn`。
+
+### 1. 安装依赖
+
+```bash
+cd chathub-desktop
+yarn install
+```
+
+### 2. 本地开发调试
+
+启动 Vite 开发服务器和 Electron 主进程：
+
+```bash
+yarn dev
+```
+
+### 3. 构建打包生产客户端
+
+打包出适配当前操作系统的免安装/安装包程序：
+
+```bash
+yarn package
+```
+打包输出的文件将保存在 `chathub-web/release/` 目录下。
+
+---
+
+## 📂 项目结构
+
+```text
+myChathub/
+├── chathub-web/
+│   ├── main.cjs             # Electron 主进程 (窗口创建、代理拦截、原生菜单移除等)
+│   ├── preload.cjs          # Electron 预加载脚本
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── components/  # 公用 UI 组件 (SyncTerminal, Sidebar, settings...)
+│   │   │   ├── hooks/       # React 自定义 Hook (useChatbots, usePremium...)
+│   │   │   ├── pages/       # 主页面组件 (MultiBotChatPanel, SettingPage...)
+│   │   │   └── router.tsx   # 路由管理
+│   │   ├── services/        # 系统底层服务 (storage, sentry, user-config...)
+│   │   └── shim/            # 兼容性 Mock 文件
+│   ├── package.json         # 项目配置文件与依赖管理
+│   └── vite.config.ts       # Vite 配置文件
+└── README.md                # 项目自述文档
+```
+
+---
+
+## 🤝 参与贡献
+
+我们非常欢迎任何形式的贡献，无论是报告 Bug、提出新功能，还是提交 Pull Request。
+
+1. Fork 本仓库。
+2. 创建您的特性分支 (`git checkout -b feature/amazing-feature`)。
+3. 提交您的修改 (`git commit -m 'feat: add some amazing feature'`)。
+4. 推送到您的分支 (`git push origin feature/amazing-feature`)。
+5. 在本仓库发起一个 Pull Request。
+
+---
+
+## 📄 开源协议
+
+本项目基于 **GPL v3** 协议开源。详情见 [LICENSE](LICENSE) 文件。
