@@ -3,10 +3,8 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import { sample } from 'lodash-es'
 import { FC, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { FiTerminal } from 'react-icons/fi'
 import { cx } from '~/utils'
-import LayoutSwitch from '~app/components/Chat/LayoutSwitch'
-import SyncTerminal from '~app/components/Chat/SyncTerminal'
+import SyncInputBox from '~app/components/Chat/SyncInputBox'
 import { Layout } from '~app/consts'
 import { useEnabledBots } from '~app/hooks/use-enabled-bots'
 import { usePremium } from '~app/hooks/use-premium'
@@ -45,7 +43,7 @@ const GeneralChatPanel: FC<{
   supportImageInput?: boolean
 }> = ({ botIds, setBots, supportImageInput }) => {
   const [layout, setLayout] = useAtom(layoutAtom)
-  const [isTerminalOpen, setIsTerminalOpen] = useState(false)
+  const [isInputBarOpen, setIsInputBarOpen] = useState(true)
 
   const setPremiumModalOpen = useSetAtom(showPremiumModalAtom)
   const premiumState = usePremium()
@@ -57,12 +55,12 @@ const GeneralChatPanel: FC<{
     }
   }, [botIds.length, disabled, setPremiumModalOpen, supportImageInput])
 
-  // Toggle terminal via Ctrl + ` shortcut
+  // Toggle input bar via Ctrl + ` shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === '`') {
         e.preventDefault()
-        setIsTerminalOpen((prev) => !prev)
+        setIsInputBarOpen((prev) => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -90,80 +88,87 @@ const GeneralChatPanel: FC<{
     [setLayout],
   )
 
-  const handleSend = useCallback((text: string) => {
-    if (!text.trim()) return
-
+  const handleSend = useCallback(async (text: string, files: File[]) => {
     const webviews = document.querySelectorAll('webview')
     if (webviews.length === 0) return
 
-    const script = `
-      (function(text) {
-        function findInput() {
-          const selectors = [
-            '#prompt-textarea',
-            'textarea[placeholder*="message"]',
-            'textarea[placeholder*="chat"]',
-            'textarea[placeholder*="问"]',
-            'textarea[placeholder*="聊"]',
-            'textarea[placeholder*="输入"]',
-            'textarea[placeholder*="Ask"]',
-            'textarea',
-            '[contenteditable="true"]',
-            '[role="textbox"]',
-            'input[type="text"]'
-          ];
-          for (const selector of selectors) {
-            const el = document.querySelector(selector);
-            if (el && el.offsetHeight > 0) return el;
+    // 1. Separate images and text/document files
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'))
+    const textFiles = files.filter((f) => !f.type.startsWith('image/'))
+
+    // 2. Read text files content
+    const readTextFile = (file: File): Promise<string> => {
+      return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsText(file)
+      })
+    }
+
+    let finalPrompt = text
+    for (const file of textFiles) {
+      try {
+        const content = await readTextFile(file)
+        finalPrompt = `[File: ${file.name}]\n\`\`\`\n${content}\n\`\`\`\n\n${finalPrompt}`
+      } catch (err) {
+        console.error('Failed to read file:', file.name, err)
+      }
+    }
+
+    // Script to focus the chatbot's input element
+    const focusScript = `
+      (function() {
+        const selectors = [
+          '#prompt-textarea',
+          'textarea[placeholder*="message"]',
+          'textarea[placeholder*="chat"]',
+          'textarea[placeholder*="问"]',
+          'textarea[placeholder*="聊"]',
+          'textarea[placeholder*="输入"]',
+          'textarea[placeholder*="Ask"]',
+          'textarea',
+          '[contenteditable="true"]',
+          '[role="textbox"]',
+          'input[type="text"]'
+        ];
+        for (const selector of selectors) {
+          const el = document.querySelector(selector);
+          if (el && el.offsetHeight > 0) {
+            el.focus();
+            return true;
           }
-          return null;
+        }
+        return false;
+      })()
+    `
+
+    // Script to trigger click on send button
+    const sendScript = `
+      (function() {
+        let sendBtn = null;
+        const btnSelectors = [
+          'button[data-testid="send-button"]',
+          'button[aria-label*="Send"]',
+          'button[aria-label*="发送"]',
+          'button[aria-label*="submit"]',
+          'button[type="submit"]',
+          'button.send-button',
+          '[class*="send"] button',
+          'button[class*="send"]'
+        ];
+
+        for (const sel of btnSelectors) {
+          const btn = document.querySelector(sel);
+          if (btn && !btn.disabled && btn.offsetHeight > 0) {
+            sendBtn = btn;
+            break;
+          }
         }
 
-        const inputEl = findInput();
-        if (!inputEl) return false;
-
-        inputEl.focus();
-
-        if (inputEl.tagName === 'TEXTAREA' || inputEl.tagName === 'INPUT') {
-          const valueSetter = Object.getOwnPropertyDescriptor(inputEl.constructor.prototype, 'value')?.set;
-          if (valueSetter) {
-            valueSetter.call(inputEl, text);
-          } else {
-            inputEl.value = text;
-          }
-          inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-          inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-          inputEl.innerHTML = '';
-          const textNode = document.createTextNode(text);
-          inputEl.appendChild(textNode);
-          inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-          inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
-        setTimeout(() => {
-          let sendBtn = null;
-          const btnSelectors = [
-            'button[data-testid="send-button"]',
-            'button[aria-label*="Send"]',
-            'button[aria-label*="发送"]',
-            'button[aria-label*="submit"]',
-            'button[type="submit"]',
-            'button.send-button',
-            '[class*="send"] button',
-            'button[class*="send"]'
-          ];
-
-          for (const sel of btnSelectors) {
-            const btn = document.querySelector(sel);
-            if (btn && !btn.disabled && btn.offsetHeight > 0) {
-              sendBtn = btn;
-              break;
-            }
-          }
-
-          if (!sendBtn) {
-            const container = inputEl.closest('form') || inputEl.parentElement?.parentElement;
+        if (!sendBtn) {
+          const activeEl = document.activeElement;
+          if (activeEl) {
+            const container = activeEl.closest('form') || activeEl.parentElement?.parentElement;
             if (container) {
               const buttons = Array.from(container.querySelectorAll('button'));
               sendBtn = buttons.find(b => {
@@ -177,26 +182,79 @@ const GeneralChatPanel: FC<{
               }) || buttons[buttons.length - 1];
             }
           }
+        }
 
-          if (sendBtn && !sendBtn.disabled) {
-            sendBtn.click();
-          } else {
-            const enterDown = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
-            inputEl.dispatchEvent(enterDown);
-          }
-        }, 150);
-
-        return true;
-      })(${JSON.stringify(text)});
+        if (sendBtn && !sendBtn.disabled) {
+          sendBtn.click();
+          return true;
+        } else if (document.activeElement) {
+          const enterDown = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+          document.activeElement.dispatchEvent(enterDown);
+          return true;
+        }
+        return false;
+      })()
     `
 
-    webviews.forEach((webview: any) => {
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    // Save current clipboard contents to restore later
+    let originalClipboardItems: any[] = []
+    try {
+      originalClipboardItems = await navigator.clipboard.read()
+    } catch (e) {
+      // Ignored if empty or unsupported
+    }
+
+    // Process each webview sequentially
+    for (const webview of Array.from(webviews)) {
       try {
-        webview.executeJavaScript(script)
+        const wv = webview as any
+
+        // 1. Focus the input in guest page
+        await wv.executeJavaScript(focusScript)
+        await delay(50)
+
+        // 2. Paste images
+        for (const imgFile of imageFiles) {
+          try {
+            const buffer = await imgFile.arrayBuffer()
+            const blob = new Blob([buffer], { type: imgFile.type })
+            await navigator.clipboard.write([
+              new ClipboardItem({ [imgFile.type]: blob })
+            ])
+            await delay(50)
+            wv.paste()
+            await delay(150)
+          } catch (err) {
+            console.error('Failed to write image to clipboard:', err)
+          }
+        }
+
+        // 3. Paste prompt text
+        if (finalPrompt) {
+          await navigator.clipboard.writeText(finalPrompt)
+          await delay(50)
+          wv.paste()
+          await delay(100)
+        }
+
+        // 4. Click Send
+        await wv.executeJavaScript(sendScript)
+        await delay(100)
       } catch (err) {
-        console.error('Failed to execute broadcast in webview:', err)
+        console.error('Failed to broadcast to webview:', err)
       }
-    })
+    }
+
+    // Restore original clipboard items
+    try {
+      if (originalClipboardItems.length > 0) {
+        await navigator.clipboard.write(originalClipboardItems)
+      }
+    } catch (e) {
+      // Ignored
+    }
   }, [])
 
   return (
@@ -217,22 +275,9 @@ const GeneralChatPanel: FC<{
           />
         ))}
       </div>
-      <div className="flex flex-row items-center justify-between gap-3 mt-3 px-1">
-        <LayoutSwitch layout={layout} onChange={onLayoutChange} />
-        <button
-          onClick={() => setIsTerminalOpen((prev) => !prev)}
-          className={cx(
-            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm transition-all border font-medium select-none cursor-pointer',
-            isTerminalOpen
-              ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
-              : 'bg-primary-background border-primary-border text-primary-text hover:bg-[#0000000a] dark:hover:bg-[#ffffff0a]',
-          )}
-        >
-          <FiTerminal className="w-4 h-4" />
-          <span>{isTerminalOpen ? '隐藏终端' : '同步终端'}</span>
-        </button>
-      </div>
-      <SyncTerminal isOpen={isTerminalOpen} onClose={() => setIsTerminalOpen(false)} onSend={handleSend} />
+      {isInputBarOpen && (
+        <SyncInputBox layout={layout} onLayoutChange={onLayoutChange} onSend={handleSend} />
+      )}
     </div>
   )
 }
